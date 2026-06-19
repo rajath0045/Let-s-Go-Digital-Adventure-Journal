@@ -1,0 +1,23 @@
+{
+  "short_name": "Let's Go!",
+  "name": "Let's Go! - Adventure Journal",
+  "icons": [
+    {
+      "src": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=192&h=192",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=512&h=512",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#080a10",
+  "theme_color": "#5046e6",
+  "display": "standalone",
+  "orientation": "portrait"
+}
