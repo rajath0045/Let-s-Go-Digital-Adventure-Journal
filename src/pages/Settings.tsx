@@ -10,11 +10,12 @@ import {
   Bell,
   ExternalLink,
   ShieldCheck,
-  ShieldAlert
+  ShieldAlert,
+  Cloud
 } from 'lucide-react';
 
 export const Settings: React.FC = () => {
-  const { user } = useAuth();
+  const { user, login, signUp, logout } = useAuth();
   const { toast } = useToast();
 
   // Settings State persisted in localStorage
@@ -36,6 +37,12 @@ export const Settings: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const [exportedSheetUrl, setExportedSheetUrl] = useState<string | null>(null);
+
+  // Auth Form State
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
 
   // Fetch quests
   const { data: quests = [] } = useQuery<Quest[]>({
@@ -91,6 +98,41 @@ export const Settings: React.FC = () => {
     }
   };
 
+  const handleSyncSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) {
+      toast('Please fill out all credentials fields.', 'error');
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      if (authMode === 'signup') {
+        await signUp(email.trim(), password.trim());
+        toast('Sync Account created and device successfully linked!', 'success');
+      } else {
+        await login(email.trim(), password.trim());
+        toast('Device successfully synced to your cloud journal!', 'success');
+      }
+      setEmail('');
+      setPassword('');
+    } catch (err: any) {
+      toast(err.message || 'Authentication failed.', 'error');
+      console.error(err);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast('Device unsynced. Your session is now local/anonymous.', 'success');
+    } catch (err: any) {
+      toast(err.message || 'Logout failed.', 'error');
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6 text-left">
       {/* 1. Database Connection Status */}
@@ -118,6 +160,116 @@ export const Settings: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* 2. Cloud Sync & Device Sharing */}
+      <div className="journal-paper p-5 rounded-lg border border-parchment-200 dark:border-rpg-border shadow-sm space-y-4">
+        <h3 className="font-serif font-bold text-sm uppercase tracking-wider text-parchment-900 dark:text-white m-0 border-b border-parchment-200 dark:border-rpg-border pb-2 flex items-center gap-2">
+          <Cloud className="text-amber-500" size={16} /> Cloud Sync & Device Sharing
+        </h3>
+
+        {!isSupabaseConfigured ? (
+          <p className="text-xs text-parchment-650 dark:text-gray-400 italic">
+            Cloud sync is not available in local database mode. Set up Supabase environment variables in `.env` to enable multi-device sync.
+          </p>
+        ) : (
+          <div className="space-y-4 text-xs">
+            {/* If user is anonymous or logged in as the default shared account */}
+            {user?.is_anonymous || user?.email === 'explorer@questvault.com' ? (
+              <div className="space-y-4">
+                <p className="text-xs text-parchment-650 dark:text-gray-400">
+                  {user?.email === 'explorer@questvault.com' ? (
+                    <span>Your device is currently using the <strong>Default Shared Cloud Journal</strong>. Any device accessing the app will see this journal by default. You can register your own private Sync Account below:</span>
+                  ) : (
+                    <span>Your journal is currently in <strong>anonymous mode</strong> on this device. Create a Cloud Sync Account to save your quests to the cloud and share them across different devices!</span>
+                  )}
+                </p>
+
+                <form onSubmit={handleSyncSubmit} className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="font-serif font-semibold text-[10px] uppercase tracking-wider text-parchment-800 dark:text-gray-400">
+                        Email Address
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="adventure@example.com"
+                        className="px-3 py-2 bg-parchment-50 dark:bg-rpg-charcoal border border-parchment-300 dark:border-rpg-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 dark:focus:ring-rpg-gold text-parchment-900 dark:text-white"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-serif font-semibold text-[10px] uppercase tracking-wider text-parchment-800 dark:text-gray-400">
+                        Password
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="px-3 py-2 bg-parchment-50 dark:bg-rpg-charcoal border border-parchment-300 dark:border-rpg-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 dark:focus:ring-rpg-gold text-parchment-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      type="submit"
+                      onClick={() => setAuthMode('signup')}
+                      disabled={authLoading}
+                      className="flex-1 py-2 px-4 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded font-serif font-bold uppercase tracking-wider text-[11px] transition shadow flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      {authLoading && authMode === 'signup' ? 'Upgrading...' : 'Register Sync Account'}
+                    </button>
+                    <button
+                      type="submit"
+                      onClick={() => setAuthMode('login')}
+                      disabled={authLoading}
+                      className="flex-1 py-2 px-4 bg-parchment-200 hover:bg-parchment-350 dark:bg-rpg-charcoal dark:hover:bg-rpg-border border border-parchment-350 dark:border-rpg-border rounded font-serif font-bold uppercase tracking-wider text-[11px] text-parchment-800 dark:text-gray-300 transition shadow flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      {authLoading && authMode === 'login' ? 'Connecting...' : 'Log In to Sync'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : (
+              // If user has permanent account
+              <div className="space-y-4">
+                <div className="flex items-center justify-between bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-900 p-4 rounded text-xs">
+                  <div>
+                    <span className="font-semibold text-emerald-800 dark:text-emerald-300 block mb-0.5">Device Sync Activated!</span>
+                    <p className="text-[10px] text-parchment-650 dark:text-gray-400">
+                      Your journal is linked to: <strong className="text-parchment-900 dark:text-white">{user?.email}</strong>
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="py-1.5 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded font-serif font-bold uppercase tracking-wider text-[10px] transition shadow cursor-pointer"
+                  >
+                    Unsync Device
+                  </button>
+                </div>
+
+                <div className="bg-parchment-50 dark:bg-rpg-charcoal/30 p-4 rounded border border-parchment-200 dark:border-rpg-border/50 space-y-2">
+                  <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-amber-700 dark:text-rpg-gold">
+                    Multi-Device Instructions
+                  </h4>
+                  <p className="text-[11px] text-parchment-700 dark:text-gray-400 leading-normal">
+                    To access this exact journal on a mobile phone, tablet, or another browser:
+                  </p>
+                  <ol className="list-decimal pl-5 space-y-1 text-[11px] text-parchment-700 dark:text-gray-400">
+                    <li>Open this web app link on the other device.</li>
+                    <li>Go to Settings → Cloud Sync & Device Sharing.</li>
+                    <li>Choose <strong>Log In to Sync</strong> and enter the email and password: <strong>{user?.email}</strong>.</li>
+                  </ol>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 3. Google Sheets Integration */}

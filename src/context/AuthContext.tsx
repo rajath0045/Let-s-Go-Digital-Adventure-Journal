@@ -41,20 +41,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const login = async (_email: string, _password: string) => {
-    return DEFAULT_USER;
+  const login = async (email: string, password: string) => {
+    const loggedInUser = await authService.login(email, password);
+    if (loggedInUser) {
+      setUser(loggedInUser);
+    }
+    return loggedInUser;
   };
 
-  const signUp = async (_email: string, _password: string) => {
-    return DEFAULT_USER;
+  const signUp = async (email: string, password: string) => {
+    const signedUpUser = await authService.signUp(email, password);
+    if (signedUpUser) {
+      setUser(signedUpUser);
+    }
+    return signedUpUser;
   };
 
   const signInWithGoogle = async () => {
-    // No-op
+    await authService.signInWithGoogle();
   };
 
   const logout = async () => {
-    setUser(DEFAULT_USER);
+    await authService.logout();
+    const currentUser = await authService.getCurrentUser();
+    setUser(currentUser || DEFAULT_USER);
   };
 
   return (

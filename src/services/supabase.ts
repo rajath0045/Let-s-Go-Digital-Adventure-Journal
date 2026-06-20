@@ -210,9 +210,16 @@ let activeAuthPromise: Promise<any> | null = null;
 export const authService = {
   async signUp(email: string, password: string) {
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) throw error;
-      return data.user;
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser && currentUser.is_anonymous) {
+        const { data, error } = await supabase.auth.updateUser({ email, password });
+        if (error) throw error;
+        return data.user;
+      } else {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        return data.user;
+      }
     } else {
       // Mock SignUp returning DEFAULT_USER
       return DEFAULT_USER;
@@ -261,14 +268,28 @@ export const authService = {
             return user;
           }
 
-          console.log('[Auth] No session found, running signInAnonymously()');
-          const { data, error } = await supabase.auth.signInAnonymously();
-          if (error) {
-            console.error('[Auth] signInAnonymously() failed with error:', error);
-            throw error;
+          console.log('[Auth] No session found, trying to log in as default shared user');
+          try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+              email: 'explorer@questvault.com',
+              password: 'DefaultSharedPassword123!'
+            });
+            if (error) {
+              console.log('[Auth] Default shared user login failed, trying to register it...');
+              const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                email: 'explorer@questvault.com',
+                password: 'DefaultSharedPassword123!'
+              });
+              if (signUpError) throw signUpError;
+              return signUpData.user;
+            }
+            return data.user;
+          } catch (err) {
+            console.warn('[Auth] Failed to sign in default shared user, falling back to anonymous sign-in:', err);
+            const { data, error } = await supabase.auth.signInAnonymously();
+            if (error) throw error;
+            return data.user;
           }
-          console.log('[Auth] signInAnonymously() succeeded, user:', data.user?.id);
-          return data.user;
         } catch (e) {
           console.error('[Auth] Failed to get or sign in user to Supabase, returning DEFAULT_USER:', e);
           return DEFAULT_USER;
@@ -352,6 +373,7 @@ export const questService = {
       const { data, error } = await supabase
         .from('quests')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
