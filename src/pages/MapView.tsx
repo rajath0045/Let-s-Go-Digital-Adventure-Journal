@@ -21,16 +21,68 @@ L.Marker.prototype.options.icon = DefaultIcon;
 
 // Simple client-side geocoder cache to avoid API keys and rate limits
 const GEOCODE_CACHE: Record<string, [number, number]> = {
+  'kyoto': [35.0116, 135.7681],
   'kyoto, japan': [35.0116, 135.7681],
+  'tokyo': [35.6762, 139.6503],
   'tokyo, japan': [35.6762, 139.6503],
+  'mt fuji': [35.3606, 138.7274],
   'mt fuji, japan': [35.3606, 138.7274],
+  'osaka': [34.6937, 135.5023],
+  'osaka, japan': [34.6937, 135.5023],
+  'new york': [40.7128, -74.0060],
   'new york, usa': [40.7128, -74.0060],
+  'nyc': [40.7128, -74.0060],
+  'ny': [40.7128, -74.0060],
+  'san francisco': [37.7749, -122.4194],
+  'san francisco, usa': [37.7749, -122.4194],
+  'sf': [37.7749, -122.4194],
+  'los angeles': [34.0522, -118.2437],
+  'los angeles, usa': [34.0522, -118.2437],
+  'la': [34.0522, -118.2437],
+  'london': [51.5074, -0.1278],
   'london, uk': [51.5074, -0.1278],
+  'london, united kingdom': [51.5074, -0.1278],
+  'paris': [48.8566, 2.3522],
   'paris, france': [48.8566, 2.3522],
-  'sydney, australia': [-33.8688, 151.2093],
+  'berlin': [52.5200, 13.4050],
+  'berlin, germany': [52.5200, 13.4050],
+  'rome': [41.9028, 12.4964],
   'rome, italy': [41.9028, 12.4964],
+  'cairo': [30.0444, 31.2357],
   'cairo, egypt': [30.0444, 31.2357],
+  'sydney': [-33.8688, 151.2093],
+  'sydney, australia': [-33.8688, 151.2093],
+  'melbourne': [-37.8136, 144.9631],
+  'melbourne, australia': [-37.8136, 144.9631],
+  'toronto': [43.6532, -79.3832],
+  'toronto, canada': [43.6532, -79.3832],
+  'vancouver': [49.2827, -123.1207],
+  'vancouver, canada': [49.2827, -123.1207],
+  'singapore': [1.3521, 103.8198],
+  'hong kong': [22.3193, 114.1694],
+  'hong kong, china': [22.3193, 114.1694],
+  'seoul': [37.5665, 126.9780],
+  'seoul, south korea': [37.5665, 126.9780],
+  'mumbai': [19.0760, 72.8777],
+  'mumbai, india': [19.0760, 72.8777],
+  'delhi': [28.6139, 77.2090],
+  'delhi, india': [28.6139, 77.2090],
+  'bangalore': [12.9716, 77.5946],
+  'bangalore, india': [12.9716, 77.5946],
+  'bangkok': [13.7563, 100.5018],
+  'bangkok, thailand': [13.7563, 100.5018],
+  'bali': [-8.4095, 115.1889],
+  'bali, indonesia': [-8.4095, 115.1889],
+  'cape town': [-33.9249, 18.4241],
+  'cape town, south africa': [-33.9249, 18.4241],
+  'rio de janeiro': [-22.9068, -43.1729],
+  'rio de janeiro, brazil': [-22.9068, -43.1729],
+  'buenos aires': [-34.6037, -58.3816],
+  'buenos aires, argentina': [-34.6037, -58.3816],
   'iceland': [64.9631, -19.0208],
+  'reykjavik': [64.1466, -21.9426],
+  'reykjavik, iceland': [64.1466, -21.9426],
+  'machu picchu': [-13.1631, -72.5450],
   'machu picchu, peru': [-13.1631, -72.5450]
 };
 
@@ -57,6 +109,8 @@ export const MapView: React.FC = () => {
 
   // Geocode locations to coordinates
   useEffect(() => {
+    let active = true;
+
     if (locationQuests.length === 0) {
       setGeocodedQuests([]);
       return;
@@ -67,6 +121,8 @@ export const MapView: React.FC = () => {
       const results: (Quest & { lat: number; lng: number })[] = [];
 
       for (const quest of locationQuests) {
+        if (!active) return;
+
         const loc = quest.location!.trim();
         const locLower = loc.toLowerCase();
 
@@ -79,10 +135,12 @@ export const MapView: React.FC = () => {
 
         // 2. Perform a lightweight search using free OpenStreetMap Nominatim API
         try {
-          // Pause slightly to respect Nominatim usage policy (1 request per second max, but we check cache first)
-          await new Promise(resolve => setTimeout(resolve, 300));
+          // Pause slightly (1s) to respect Nominatim usage policy (1 request per second max, but we check cache first)
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          if (!active) return;
+
           const response = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(loc)}&limit=1`
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(loc)}&limit=1&email=explorer@questvault.com`
           );
           if (response.ok) {
             const data = await response.json();
@@ -100,20 +158,71 @@ export const MapView: React.FC = () => {
           console.error(`Geocoding failed for location: ${loc}`, e);
         }
 
-        // 3. Fallback (place slightly offset from origin to avoid overlap)
+        // 3. Fallback (place slightly offset from major region coordinates or default to avoid overlap)
+        let fallbackLat = 30.0;
+        let fallbackLng = 0.0;
+
+        if (locLower.includes('japan') || locLower.includes('kyoto') || locLower.includes('tokyo') || locLower.includes('osaka')) {
+          [fallbackLat, fallbackLng] = [35.6762, 139.6503]; // Tokyo
+        } else if (locLower.includes('usa') || locLower.includes('united states') || locLower.includes('america') || locLower.includes('york') || locLower.includes('california')) {
+          [fallbackLat, fallbackLng] = [38.9072, -77.0369]; // Washington DC
+        } else if (locLower.includes('uk') || locLower.includes('united kingdom') || locLower.includes('england') || locLower.includes('london')) {
+          [fallbackLat, fallbackLng] = [51.5074, -0.1278]; // London
+        } else if (locLower.includes('france') || locLower.includes('paris')) {
+          [fallbackLat, fallbackLng] = [48.8566, 2.3522]; // Paris
+        } else if (locLower.includes('germany') || locLower.includes('berlin')) {
+          [fallbackLat, fallbackLng] = [52.5200, 13.4050]; // Berlin
+        } else if (locLower.includes('italy') || locLower.includes('rome')) {
+          [fallbackLat, fallbackLng] = [41.9028, 12.4964]; // Rome
+        } else if (locLower.includes('australia') || locLower.includes('sydney') || locLower.includes('melbourne')) {
+          [fallbackLat, fallbackLng] = [-33.8688, 151.2093]; // Sydney
+        } else if (locLower.includes('canada') || locLower.includes('toronto') || locLower.includes('vancouver')) {
+          [fallbackLat, fallbackLng] = [43.6532, -79.3832]; // Toronto
+        } else if (locLower.includes('india') || locLower.includes('delhi') || locLower.includes('mumbai') || locLower.includes('bangalore')) {
+          [fallbackLat, fallbackLng] = [28.6139, 77.2090]; // Delhi
+        } else if (locLower.includes('egypt') || locLower.includes('cairo')) {
+          [fallbackLat, fallbackLng] = [30.0444, 31.2357]; // Cairo
+        } else if (locLower.includes('peru') || locLower.includes('machu picchu')) {
+          [fallbackLat, fallbackLng] = [-13.1631, -72.5450]; // Machu Picchu
+        } else if (locLower.includes('iceland') || locLower.includes('reykjavik')) {
+          [fallbackLat, fallbackLng] = [64.1466, -21.9426]; // Reykjavik
+        } else if (locLower.includes('singapore')) {
+          [fallbackLat, fallbackLng] = [1.3521, 103.8198]; // Singapore
+        } else if (locLower.includes('china') || locLower.includes('hong kong')) {
+          [fallbackLat, fallbackLng] = [22.3193, 114.1694]; // Hong Kong
+        } else if (locLower.includes('korea') || locLower.includes('seoul')) {
+          [fallbackLat, fallbackLng] = [37.5665, 126.9780]; // Seoul
+        } else if (locLower.includes('thailand') || locLower.includes('bangkok')) {
+          [fallbackLat, fallbackLng] = [13.7563, 100.5018]; // Bangkok
+        } else if (locLower.includes('indonesia') || locLower.includes('bali')) {
+          [fallbackLat, fallbackLng] = [-8.4095, 115.1889]; // Bali
+        } else if (locLower.includes('south africa') || locLower.includes('cape town')) {
+          [fallbackLat, fallbackLng] = [-33.9249, 18.4241]; // Cape Town
+        } else if (locLower.includes('brazil') || locLower.includes('rio')) {
+          [fallbackLat, fallbackLng] = [-22.9068, -43.1729]; // Rio de Janeiro
+        } else if (locLower.includes('argentina') || locLower.includes('buenos aires')) {
+          [fallbackLat, fallbackLng] = [-34.6037, -58.3816]; // Buenos Aires
+        }
+
         const offset = Math.random() * 0.1 - 0.05;
         results.push({ 
           ...quest, 
-          lat: 30.0 + offset, 
-          lng: 0.0 + offset 
+          lat: fallbackLat + offset, 
+          lng: fallbackLng + offset 
         });
       }
 
-      setGeocodedQuests(results);
-      setIsGeocoding(false);
+      if (active) {
+        setGeocodedQuests(results);
+        setIsGeocoding(false);
+      }
     };
 
     geocodeAll();
+
+    return () => {
+      active = false;
+    };
   }, [quests]);
 
   // Initialize Map

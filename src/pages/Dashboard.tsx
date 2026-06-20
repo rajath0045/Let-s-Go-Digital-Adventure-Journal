@@ -149,10 +149,13 @@ export const Dashboard: React.FC = () => {
   // Filter & Search Logic
   const filteredQuests = quests
     .filter(q => {
-      // 1. Status Filter
+      // 1. Exclude Completed quests from dashboard
+      if (q.status === 'Completed') return false;
+
+      // 2. Status Filter
       if (statusFilter !== 'All' && q.status !== statusFilter) return false;
 
-      // 2. Search filter (title, location, lore)
+      // 3. Search filter (title, location, lore)
       const qSearch = search.toLowerCase();
       if (!qSearch) return true;
 

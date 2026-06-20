@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
 
 // Detect if we have real Supabase config
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
@@ -10,7 +10,7 @@ export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 if (!isSupabaseConfigured) {
   console.warn(
     'QuestVault: Supabase keys are missing. Falling back to LocalStorage mode. ' +
-    'To use Supabase, configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.'
+    'To use Supabase, configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY) in your .env file.'
   );
 }
 
